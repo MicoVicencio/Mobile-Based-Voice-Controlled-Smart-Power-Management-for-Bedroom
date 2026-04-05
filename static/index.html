@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NEXUS — Smart Home Control</title>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #070b12;
+      --surface:   #0d1422;
+      --border:    #1a2840;
+      --glow-c:    #00d4ff;
+      --glow-g:    #00ff9d;
+      --glow-w:    #ff6b35;
+      --glow-p:    #a855f7;
+      --text:      #ccd6f6;
+      --muted:     #4a6080;
+      --on:        #00ff9d;
+      --off:       #ff3b5c;
+      --mono:      'Share Tech Mono', monospace;
+      --sans:      'Rajdhani', sans-serif;
+    }
+
+    html { font-size: 16px; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── GRID BACKGROUND ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,212,255,.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── SCANLINES ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,.15) 2px,
+        rgba(0,0,0,.15) 4px
+      );
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    /* ── HEADER ── */
+    header {
+      position: relative;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.2rem 2.5rem;
+      border-bottom: 1px solid var(--border);
+      background: rgba(7,11,18,.85);
+      backdrop-filter: blur(12px);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+
+    .logo-icon {
+      width: 38px; height: 38px;
+      border: 1.5px solid var(--glow-c);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 0 12px rgba(0,212,255,.4), inset 0 0 8px rgba(0,212,255,.1);
+      animation: pulse-border 3s ease-in-out infinite;
+    }
+
+    @keyframes pulse-border {
+      0%,100% { box-shadow: 0 0 12px rgba(0,212,255,.4), inset 0 0 8px rgba(0,212,255,.1); }
+      50%      { box-shadow: 0 0 22px rgba(0,212,255,.7), inset 0 0 14px rgba(0,212,255,.2); }
+    }
+
+    .logo-icon svg { width: 20px; height: 20px; fill: none; stroke: var(--glow-c); stroke-width: 1.5; }
+
+    .logo-text {
+      font-family: var(--mono);
+      font-size: 1.1rem;
+      letter-spacing: .2em;
+      color: var(--glow-c);
+      text-shadow: 0 0 12px rgba(0,212,255,.6);
+    }
+
+    .logo-sub {
+      font-size: .65rem;
+      color: var(--muted);
+      letter-spacing: .15em;
+      font-family: var(--mono);
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      font-family: var(--mono);
+      font-size: .72rem;
+      color: var(--muted);
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--on);
+      box-shadow: 0 0 6px var(--on);
+      animation: blink 2s ease-in-out infinite;
+    }
+
+    .dot.offline { background: var(--off); box-shadow: 0 0 6px var(--off); animation: none; }
+
+    @keyframes blink {
+      0%,100% { opacity: 1; } 50% { opacity: .3; }
+    }
+
+    .time-display {
+      font-family: var(--mono);
+      font-size: .8rem;
+      color: var(--glow-c);
+      opacity: .7;
+    }
+
+    /* ── MAIN LAYOUT ── */
+    main {
+      position: relative;
+      z-index: 10;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* ── SECTION TITLE ── */
+    .section-label {
+      font-family: var(--mono);
+      font-size: .7rem;
+      letter-spacing: .25em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+    }
+
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(90deg, var(--border), transparent);
+    }
+
+    /* ── TEMPERATURE HERO ── */
+    .temp-hero {
+      display: flex;
+      align-items: stretch;
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .temp-card {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      position: relative;
+      overflow: hidden;
+      transition: transform .3s ease, box-shadow .3s ease;
+    }
+
+    .temp-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 40px rgba(0,212,255,.1);
+    }
+
+    .temp-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--glow-c), transparent);
+      animation: scan 4s linear infinite;
+    }
+
+    @keyframes scan {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+    }
+
+    .temp-main {
+      display: flex;
+      align-items: flex-end;
+      gap: .5rem;
+      margin: .5rem 0 1rem;
+    }
+
+    .temp-value {
+      font-family: var(--mono);
+      font-size: 5rem;
+      line-height: 1;
+      color: var(--glow-c);
+      text-shadow: 0 0 30px rgba(0,212,255,.5);
+      transition: all .5s ease;
+    }
+
+    .temp-unit {
+      font-family: var(--mono);
+      font-size: 1.8rem;
+      color: var(--muted);
+      margin-bottom: .5rem;
+    }
+
+    .temp-bar-wrap {
+      background: rgba(0,0,0,.3);
+      border-radius: 4px;
+      height: 6px;
+      overflow: hidden;
+      margin-top: .75rem;
+    }
+
+    .temp-bar {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, var(--glow-c), var(--glow-g));
+      transition: width 1s cubic-bezier(.4,0,.2,1);
+      box-shadow: 0 0 8px var(--glow-c);
+    }
+
+    .temp-label { font-size: .7rem; color: var(--muted); font-family: var(--mono); letter-spacing: .1em; }
+
+    /* ── STATS SIDEBAR ── */
+    .stats-col {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      min-width: 200px;
+    }
+
+    .stat-card {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.2rem 1.4rem;
+      position: relative;
+      overflow: hidden;
+      transition: transform .3s, box-shadow .3s;
+    }
+
+    .stat-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.3); }
+
+    .stat-val {
+      font-family: var(--mono);
+      font-size: 2rem;
+      line-height: 1;
+      margin: .3rem 0 .1rem;
+    }
+
+    .stat-lbl { font-size: .7rem; font-family: var(--mono); color: var(--muted); letter-spacing: .1em; }
+
+    .accent-c { color: var(--glow-c); text-shadow: 0 0 12px rgba(0,212,255,.5); }
+    .accent-g { color: var(--glow-g); text-shadow: 0 0 12px rgba(0,255,157,.5); }
+    .accent-w { color: var(--glow-w); text-shadow: 0 0 12px rgba(255,107,53,.5); }
+    .accent-p { color: var(--glow-p); text-shadow: 0 0 12px rgba(168,85,247,.5); }
+
+    /* ── DEVICE GRID ── */
+    .device-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .device-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.6rem;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      transition: transform .3s cubic-bezier(.34,1.56,.64,1), box-shadow .3s ease, border-color .3s ease;
+      user-select: none;
+    }
+
+    .device-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse at top left, rgba(0,212,255,.06), transparent 60%);
+      opacity: 0;
+      transition: opacity .4s;
+    }
+
+    .device-card:hover { transform: translateY(-4px) scale(1.01); }
+    .device-card:hover::after { opacity: 1; }
+    .device-card:active { transform: scale(.97); }
+
+    .device-card.on {
+      border-color: rgba(0,255,157,.3);
+      box-shadow: 0 0 20px rgba(0,255,157,.08), inset 0 0 20px rgba(0,255,157,.03);
+    }
+
+    .device-card.off { border-color: var(--border); }
+
+    .device-card.on::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--on), transparent);
+    }
+
+    .device-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 1.4rem;
+    }
+
+    .device-icon-wrap {
+      width: 48px; height: 48px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      background: rgba(0,0,0,.3);
+      border: 1px solid var(--border);
+      transition: all .3s ease;
+    }
+
+    .device-card.on .device-icon-wrap {
+      background: rgba(0,255,157,.08);
+      border-color: rgba(0,255,157,.3);
+      box-shadow: 0 0 16px rgba(0,255,157,.15);
+    }
+
+    .device-icon-wrap svg { width: 24px; height: 24px; transition: stroke .3s; }
+    .device-card.on  .device-icon-wrap svg { filter: drop-shadow(0 0 4px var(--on)); }
+    .device-card.off .device-icon-wrap svg { opacity: .5; }
+
+    /* Toggle */
+    .toggle-wrap { position: relative; width: 48px; height: 26px; }
+
+    .toggle-wrap input { display: none; }
+
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      border-radius: 13px;
+      background: rgba(255,59,92,.2);
+      border: 1px solid rgba(255,59,92,.4);
+      transition: all .35s ease;
+      cursor: pointer;
+    }
+
+    .toggle-wrap input:checked + .toggle-track {
+      background: rgba(0,255,157,.2);
+      border-color: rgba(0,255,157,.5);
+      box-shadow: 0 0 10px rgba(0,255,157,.3);
+    }
+
+    .toggle-thumb {
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 18px; height: 18px;
+      border-radius: 50%;
+      background: var(--off);
+      transition: all .35s cubic-bezier(.34,1.56,.64,1);
+      pointer-events: none;
+      box-shadow: 0 0 6px var(--off);
+    }
+
+    .toggle-wrap input:checked ~ .toggle-thumb {
+      transform: translateX(22px);
+      background: var(--on);
+      box-shadow: 0 0 10px var(--on);
+    }
+
+    .device-name {
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: .05em;
+      color: var(--text);
+      margin-bottom: .2rem;
+    }
+
+    .device-status-text {
+      font-family: var(--mono);
+      font-size: .7rem;
+      letter-spacing: .15em;
+      transition: color .3s;
+    }
+
+    .device-card.on  .device-status-text { color: var(--on); }
+    .device-card.off .device-status-text { color: var(--muted); }
+
+    .device-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 1.2rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+
+    .device-power-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      transition: all .3s;
+    }
+
+    .device-card.on  .device-power-dot { background: var(--on);  box-shadow: 0 0 6px var(--on);  animation: blink 2s infinite; }
+    .device-card.off .device-power-dot { background: var(--muted); }
+
+    .device-type-tag {
+      font-family: var(--mono);
+      font-size: .62rem;
+      color: var(--muted);
+      letter-spacing: .1em;
+      background: rgba(255,255,255,.03);
+      padding: .2rem .5rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    /* ── MASTER CONTROLS ── */
+    .master-row {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      flex: 1;
+      min-width: 140px;
+      padding: .9rem 1.5rem;
+      border-radius: 10px;
+      border: 1px solid;
+      font-family: var(--mono);
+      font-size: .8rem;
+      letter-spacing: .15em;
+      cursor: pointer;
+      transition: all .25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: currentColor;
+      opacity: 0;
+      transition: opacity .2s;
+    }
+
+    .btn:hover::before { opacity: .07; }
+    .btn:active { transform: scale(.97); }
+
+    .btn-on {
+      background: rgba(0,255,157,.08);
+      border-color: rgba(0,255,157,.4);
+      color: var(--on);
+    }
+
+    .btn-on:hover {
+      background: rgba(0,255,157,.15);
+      box-shadow: 0 0 20px rgba(0,255,157,.2);
+    }
+
+    .btn-off {
+      background: rgba(255,59,92,.08);
+      border-color: rgba(255,59,92,.4);
+      color: var(--off);
+    }
+
+    .btn-off:hover {
+      background: rgba(255,59,92,.15);
+      box-shadow: 0 0 20px rgba(255,59,92,.2);
+    }
+
+    .btn-refresh {
+      background: rgba(0,212,255,.08);
+      border-color: rgba(0,212,255,.4);
+      color: var(--glow-c);
+    }
+
+    .btn-refresh:hover {
+      background: rgba(0,212,255,.15);
+      box-shadow: 0 0 20px rgba(0,212,255,.2);
+    }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: .85rem 1.4rem;
+      font-family: var(--mono);
+      font-size: .78rem;
+      color: var(--glow-c);
+      z-index: 1000;
+      transform: translateY(120%) scale(.9);
+      opacity: 0;
+      transition: all .4s cubic-bezier(.34,1.56,.64,1);
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    }
+
+    #toast.show { transform: translateY(0) scale(1); opacity: 1; }
+    #toast.error { color: var(--off); border-color: rgba(255,59,92,.4); }
+    #toast.success { color: var(--on); border-color: rgba(0,255,157,.4); }
+
+    /* ── CONNECTION BANNER ── */
+    #conn-banner {
+      background: rgba(255,59,92,.1);
+      border: 1px solid rgba(255,59,92,.3);
+      border-radius: 8px;
+      padding: .7rem 1.2rem;
+      margin-bottom: 1.5rem;
+      font-family: var(--mono);
+      font-size: .75rem;
+      color: var(--off);
+      display: none;
+      align-items: center;
+      gap: .6rem;
+    }
+
+    /* ── LOADING SHIMMER ── */
+    .shimmer {
+      background: linear-gradient(90deg, var(--border) 25%, rgba(255,255,255,.05) 50%, var(--border) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 6px;
+      height: 1em;
+    }
+
+    @keyframes shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 768px) {
+      header { padding: 1rem 1.2rem; }
+      .logo-text { font-size: .9rem; }
+      .temp-hero { flex-direction: column; }
+      .stats-col { flex-direction: row; }
+      .temp-value { font-size: 3.5rem; }
+      main { padding: 1.5rem 1rem 3rem; }
+      .header-right .time-display { display: none; }
+    }
+
+    @media (max-width: 480px) {
+      .stats-col { flex-wrap: wrap; }
+      .stat-card { min-width: calc(50% - .5rem); }
+    }
+
+    /* ── ENTRY ANIMATION ── */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: fadeUp .6s ease forwards;
+    }
+
+    @keyframes fadeUp {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .device-card { animation: fadeUp .5s ease forwards; opacity: 0; }
+    .device-card:nth-child(1) { animation-delay: .05s; }
+    .device-card:nth-child(2) { animation-delay: .12s; }
+    .device-card:nth-child(3) { animation-delay: .19s; }
+    .device-card:nth-child(4) { animation-delay: .26s; }
+  </style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24">
+        <polygon points="12,2 22,8 22,16 12,22 2,16 2,8"/>
+        <circle cx="12" cy="12" r="3"/>
+        <line x1="12" y1="2"  x2="12" y2="9"/>
+        <line x1="12" y1="15" x2="12" y2="22"/>
+      </svg>
+    </div>
+    <div>
+      <div class="logo-text">NEXUS</div>
+      <div class="logo-sub">SMART HOME CONTROL</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-indicator">
+      <div class="dot" id="conn-dot"></div>
+      <span id="conn-label">SYSTEM ONLINE</span>
+    </div>
+    <div class="time-display" id="clock">--:--:--</div>
+  </div>
+</header>
+
+<main>
+
+  <!-- CONNECTION BANNER -->
+  <div id="conn-banner">
+    ⚠ &nbsp;Cannot reach server. Retrying…
+  </div>
+
+  <!-- TEMPERATURE SECTION -->
+  <div class="section-label fade-up" style="animation-delay:.05s">◈ ENVIRONMENT SENSORS</div>
+
+  <div class="temp-hero fade-up" style="animation-delay:.1s">
+    <div class="temp-card">
+      <div class="temp-label">AMBIENT TEMPERATURE</div>
+      <div class="temp-main">
+        <div class="temp-value" id="temp-val">--</div>
+        <div class="temp-unit">°C</div>
+      </div>
+      <div class="temp-label">ROOM LEVEL</div>
+      <div class="temp-bar-wrap">
+        <div class="temp-bar" id="temp-bar" style="width:0%"></div>
+      </div>
+    </div>
+
+    <div class="stats-col">
+      <div class="stat-card fade-up" style="animation-delay:.15s">
+        <div class="stat-lbl">DEVICES ACTIVE</div>
+        <div class="stat-val accent-g" id="active-count">0</div>
+      </div>
+      <div class="stat-card fade-up" style="animation-delay:.2s">
+        <div class="stat-lbl">TOTAL DEVICES</div>
+        <div class="stat-val accent-c" id="total-count">--</div>
+      </div>
+      <div class="stat-card fade-up" style="animation-delay:.25s">
+        <div class="stat-lbl">ARDUINO STATUS</div>
+        <div class="stat-val accent-w" id="arduino-status" style="font-size:1rem;margin-top:.5rem">--</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEVICES SECTION -->
+  <div class="section-label fade-up" style="animation-delay:.3s">◈ DEVICE CONTROL</div>
+
+  <div class="device-grid" id="device-grid">
+    <!-- TV -->
+    <div class="device-card off" id="card-tv" onclick="toggleDevice('tv')">
+      <div class="device-header">
+        <div class="device-icon-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="1.5">
+            <rect x="2" y="4" width="20" height="14" rx="2"/>
+            <line x1="8" y1="21" x2="16" y2="21"/>
+            <line x1="12" y1="18" x2="12" y2="21"/>
+          </svg>
+        </div>
+        <label class="toggle-wrap" onclick="event.stopPropagation()">
+          <input type="checkbox" id="tog-tv" disabled/>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div class="device-name">Television</div>
+      <div class="device-status-text" id="status-tv">OFFLINE</div>
+      <div class="device-footer">
+        <div class="device-power-dot" id="dot-tv"></div>
+        <span class="device-type-tag">ENTERTAINMENT</span>
+      </div>
+    </div>
+
+    <!-- AIRCON -->
+    <div class="device-card off" id="card-aircon" onclick="toggleDevice('aircon')">
+      <div class="device-header">
+        <div class="device-icon-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="1.5">
+            <rect x="2" y="5" width="20" height="10" rx="2"/>
+            <line x1="12" y1="15" x2="12" y2="20"/>
+            <path d="M8 20 Q12 17 16 20"/>
+            <line x1="7" y1="10" x2="17" y2="10"/>
+            <circle cx="6" cy="10" r="1" fill="#00d4ff"/>
+          </svg>
+        </div>
+        <label class="toggle-wrap" onclick="event.stopPropagation()">
+          <input type="checkbox" id="tog-aircon" disabled/>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div class="device-name">Air Conditioner</div>
+      <div class="device-status-text" id="status-aircon">OFFLINE</div>
+      <div class="device-footer">
+        <div class="device-power-dot" id="dot-aircon"></div>
+        <span class="device-type-tag">CLIMATE</span>
+      </div>
+    </div>
+
+    <!-- LIGHT -->
+    <div class="device-card off" id="card-lights" onclick="toggleDevice('lights')">
+      <div class="device-header">
+        <div class="device-icon-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="1.5">
+            <circle cx="12" cy="10" r="4"/>
+            <path d="M9.5 14.5 Q9 18 12 19 Q15 18 14.5 14.5"/>
+            <line x1="12" y1="2"  x2="12" y2="4"/>
+            <line x1="4.2"  y1="4.2"  x2="5.6" y2="5.6"/>
+            <line x1="19.8" y1="4.2"  x2="18.4" y2="5.6"/>
+            <line x1="2"  y1="10" x2="4"  y2="10"/>
+            <line x1="20" y1="10" x2="22" y2="10"/>
+          </svg>
+        </div>
+        <label class="toggle-wrap" onclick="event.stopPropagation()">
+          <input type="checkbox" id="tog-lights" disabled/>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div class="device-name">Main Lights</div>
+      <div class="device-status-text" id="status-lights">OFFLINE</div>
+      <div class="device-footer">
+        <div class="device-power-dot" id="dot-lights"></div>
+        <span class="device-type-tag">LIGHTING</span>
+      </div>
+    </div>
+
+    <!-- LAMP -->
+    <div class="device-card off" id="card-lamp" onclick="toggleDevice('lamp')">
+      <div class="device-header">
+        <div class="device-icon-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#00d4ff" stroke-width="1.5">
+            <path d="M9 2 L15 2 L18 10 L6 10 Z"/>
+            <rect x="10" y="10" width="4" height="3" rx="1"/>
+            <line x1="12" y1="13" x2="12" y2="16"/>
+            <line x1="9" y1="16" x2="15" y2="16"/>
+            <line x1="5" y1="6" x2="3" y2="5"/>
+            <line x1="19" y1="6" x2="21" y2="5"/>
+            <line x1="4" y1="10" x2="2" y2="11"/>
+            <line x1="20" y1="10" x2="22" y2="11"/>
+          </svg>
+        </div>
+        <label class="toggle-wrap" onclick="event.stopPropagation()">
+          <input type="checkbox" id="tog-lamp" disabled/>
+          <div class="toggle-track"></div>
+          <div class="toggle-thumb"></div>
+        </label>
+      </div>
+      <div class="device-name">Lamp</div>
+      <div class="device-status-text" id="status-lamp">OFFLINE</div>
+      <div class="device-footer">
+        <div class="device-power-dot" id="dot-lamp"></div>
+        <span class="device-type-tag">LIGHTING</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MASTER CONTROLS -->
+  <div class="section-label fade-up" style="animation-delay:.35s">◈ MASTER CONTROLS</div>
+
+  <div class="master-row fade-up" style="animation-delay:.4s">
+    <button class="btn btn-on"      onclick="allDevices('on')">▶ ALL DEVICES ON</button>
+    <button class="btn btn-off"     onclick="allDevices('off')">■ ALL DEVICES OFF</button>
+    <button class="btn btn-refresh" onclick="fetchStatus()">↺ REFRESH STATUS</button>
+  </div>
+
+</main>
+
+<!-- TOAST NOTIFICATION -->
+<div id="toast"></div>
+
+<script>
+  const API = '/api';
+  const devices = ['tv', 'aircon', 'lights', 'lamp'];
+  let serverOnline = false;
+
+  // ── CLOCK
+  function updateClock() {
+    const now = new Date();
+    document.getElementById('clock').textContent =
+      now.toTimeString().slice(0,8);
+  }
+  setInterval(updateClock, 1000);
+  updateClock();
+
+  // ── TOAST
+  let toastTimer;
+  function showToast(msg, type = '') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'show ' + type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.className = ''; }, 3000);
+  }
+
+  // ── UPDATE ONE DEVICE UI
+  function updateDeviceUI(name, state) {
+    const isOn   = state === 'on';
+    const card   = document.getElementById(`card-${name}`);
+    const toggle = document.getElementById(`tog-${name}`);
+    const status = document.getElementById(`status-${name}`);
+
+    if (!card) return;
+
+    card.className     = `device-card ${isOn ? 'on' : 'off'}`;
+    toggle.checked     = isOn;   // Visual sync only — checkbox is disabled
+    status.textContent = isOn ? 'ACTIVE' : 'OFFLINE';
+  }
+
+  // ── UPDATE ALL DEVICES
+  function updateAllDevicesUI(devicesObj) {
+    let active = 0;
+    for (const [name, state] of Object.entries(devicesObj)) {
+      updateDeviceUI(name, state);
+      if (state === 'on') active++;
+    }
+    document.getElementById('active-count').textContent = active;
+    document.getElementById('total-count').textContent  = Object.keys(devicesObj).length;
+  }
+
+  // ── UPDATE TEMPERATURE
+  function updateTempUI(temp) {
+    const el  = document.getElementById('temp-val');
+    const bar = document.getElementById('temp-bar');
+    if (temp === null || temp === undefined) {
+      el.textContent = '--';
+      bar.style.width = '0%';
+      return;
+    }
+    el.textContent = temp.toFixed(1);
+    // Map 10–40°C to 0–100%
+    const pct = Math.min(100, Math.max(0, ((temp - 10) / 30) * 100));
+    bar.style.width = pct + '%';
+
+    // Color shift based on temperature
+    if (temp < 20)      { bar.style.background = 'linear-gradient(90deg, #00d4ff, #a855f7)'; }
+    else if (temp < 28) { bar.style.background = 'linear-gradient(90deg, #00d4ff, #00ff9d)'; }
+    else if (temp < 33) { bar.style.background = 'linear-gradient(90deg, #00ff9d, #ff6b35)'; }
+    else                { bar.style.background = 'linear-gradient(90deg, #ff6b35, #ff3b5c)'; }
+  }
+
+  // ── SET CONNECTION STATE
+  function setOnline(online) {
+    serverOnline = online;
+    const dot    = document.getElementById('conn-dot');
+    const label  = document.getElementById('conn-label');
+    const banner = document.getElementById('conn-banner');
+    const arduino= document.getElementById('arduino-status');
+
+    if (online) {
+      dot.classList.remove('offline');
+      label.textContent  = 'SYSTEM ONLINE';
+      banner.style.display = 'none';
+    } else {
+      dot.classList.add('offline');
+      label.textContent  = 'SERVER OFFLINE';
+      banner.style.display = 'flex';
+      if (arduino) arduino.textContent = 'N/A';
+    }
+  }
+
+  // ── FETCH STATUS
+  async function fetchStatus() {
+    try {
+      const res  = await fetch(`${API}/status`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+
+      setOnline(true);
+
+      updateAllDevicesUI(data.devices || {});
+      updateTempUI(data.temperature);
+
+      const arduinoEl = document.getElementById('arduino-status');
+      arduinoEl.textContent = data.arduino_connected ? 'CONNECTED' : 'DISCONNECTED';
+      arduinoEl.style.color = data.arduino_connected ? 'var(--on)' : 'var(--off)';
+
+    } catch (e) {
+      setOnline(false);
+      console.warn('Fetch error:', e);
+    }
+  }
+
+  // ── TOGGLE DEVICE
+  // Card onclick is the ONLY trigger — checkbox is purely visual (disabled)
+  async function toggleDevice(name) {
+    const card = document.getElementById(`card-${name}`);
+    const isOn = card.classList.contains('on');
+    const newState = isOn ? 'off' : 'on';
+
+    // Optimistic UI update
+    updateDeviceUI(name, newState);
+
+    try {
+      const res = await fetch(`${API}/device/${name}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state: newState })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      showToast(`${name.toUpperCase()} → ${newState.toUpperCase()}`, newState === 'on' ? 'success' : 'error');
+      await fetchStatus();
+    } catch (e) {
+      // Revert on failure
+      updateDeviceUI(name, isOn ? 'on' : 'off');
+      showToast('⚠ Failed to reach server', 'error');
+    }
+  }
+
+  // ── ALL DEVICES
+  async function allDevices(state) {
+    // Optimistic
+    devices.forEach(d => updateDeviceUI(d, state));
+    document.getElementById('active-count').textContent = state === 'on' ? devices.length : 0;
+    document.getElementById('total-count').textContent = devices.length;
+
+    try {
+      const res = await fetch(`${API}/all`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      showToast(`ALL DEVICES → ${state.toUpperCase()}`, state === 'on' ? 'success' : 'error');
+      await fetchStatus();
+    } catch (e) {
+      showToast('⚠ Failed to reach server', 'error');
+      fetchStatus();
+    }
+  }
+
+  // ── AUTO REFRESH every 5s
+  fetchStatus();
+  setInterval(fetchStatus, 5000);
+</script>
+</body>
+</html>
